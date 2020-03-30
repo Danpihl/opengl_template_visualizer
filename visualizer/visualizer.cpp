@@ -2,147 +2,62 @@
 
 #include <algorithm>
 
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/highgui.hpp>
-#include <opencv2/imgproc.hpp>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 
 #include <arl/math/math.h>
 #include <arl/utilities/logging.h>
 
 #include "misc/colors.h"
+#include "visualizer/mouse_state.h"
 #include "visualizer/view_angles.h"
 
-#define DELTA_MOVE_FACTOR 1.5f
-#define DELTA_ANGLE_FACTOR 0.005f
-#define world_edge 10.0f
-#define GLOBAL_Y (-2.0f)
-
-Visualizer *visualizer;
+Visualizer* visualizer;
 
 GLuint programID;
 cv::Mat img;
 bool is_recording;
 int img_idx;
 
-// #define WINDOW_WIDTH 1200
-// #define WINDOW_HEIGHT 800
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 800
 
-arl::Vec3Dd axes_center(0.0, 0.0, 0.0);
-
-const std::vector<std::string> mouse_strings = {"Left", "Middle", "Right"};
-
-class MouseState
-{
-private:
-public:
-    int x;
-    int y;
-    int px;
-    int py;
-    int dx;
-    int dy;
-    const int button_enum;
-    int is_pressed;
-
-    MouseState(const int button_enum_) : button_enum(button_enum_)
-    {
-        is_pressed = 0;
-        x = -1;
-        y = -1;
-        px = -1;
-        py = -1;
-        dx = 0;
-        dy = 0;
-    }
-
-    void updateOnPress(const int button, const int state, const int x_, const int y_)
-    {
-        if (button == button_enum)
-        {
-            is_pressed = !state;
-            if (is_pressed)
-            {
-                x = x_;
-                y = y_;
-                px = x_;
-                py = y_;
-                dx = 0;
-                dy = 0;
-            }
-            else
-            {
-                x = -1;
-                y = -1;
-                px = -1;
-                py = -1;
-                dx = 0;
-                dy = 0;
-            }
-        }
-    }
-
-    void updateOnMotion(int x_, int y_)
-    {
-        if (is_pressed)
-        {
-            px = x;
-            py = y;
-            x = x_;
-            y = y_;
-            dx = x - px;
-            dy = y - py;
-        }
-    }
-
-    void print() const
-    {
-        const std::string p = is_pressed ? "pressed" : "not pressed";
-        std::cout << "Button " << mouse_strings[button_enum] << " is " << p
-                  << " with xy coords [ " << x << ", " << y << " ]" << std::endl;
-    }
-};
-
-MouseState left_mouse_button(GLFW_MOUSE_BUTTON_1);
-MouseState scroll_mouse_button(GLFW_MOUSE_BUTTON_2);
-MouseState right_mouse_button(GLFW_MOUSE_BUTTON_3);
+MouseState mouse_state(GLFW_MOUSE_BUTTON_1, GLFW_MOUSE_BUTTON_2, GLFW_MOUSE_BUTTON_3);
 
 void mouseFunc(int button, int state, int x, int y)
 {
-    left_mouse_button.updateOnPress(button, state, x, y);
-    scroll_mouse_button.updateOnPress(button, state, x, y);
-    right_mouse_button.updateOnPress(button, state, x, y);
+    mouse_state.updateOnPress(button, state, x, y);
 }
 
 void motionFunc(int x, int y)
 {
-    left_mouse_button.updateOnMotion(x, y);
-    scroll_mouse_button.updateOnMotion(x, y);
-    right_mouse_button.updateOnMotion(x, y);
+    mouse_state.updateOnMotion(x, y);
 
-    if (left_mouse_button.is_pressed)
+    if (mouse_state.getLeftButton().isPressed())
     {
+        const double dx = mouse_state.getLeftButton().getDx();
+        const double dy = mouse_state.getLeftButton().getDy();
         const double mg = 0.001;
-        visualizer->view_angles.changeAnglesWithDelta(-static_cast<double>(left_mouse_button.dx) * mg, -static_cast<double>(left_mouse_button.dy) * mg);
+        visualizer->view_angles.changeAnglesWithDelta(-static_cast<double>(dx) * mg,
+                                                      -static_cast<double>(dy) * mg);
     }
-    else if (scroll_mouse_button.is_pressed)
+    else if (mouse_state.getMiddleButton().isPressed())
     {
         const double pg = 0.001;
-        const double dx = scroll_mouse_button.dx;
-        const double dy = scroll_mouse_button.dy;
+        const double dx = mouse_state.getMiddleButton().getDx();
+        const double dy = mouse_state.getMiddleButton().getDy();
 
         const arl::Matrixd rotation_mat = visualizer->view_angles.getRotationMatrix();
         const arl::Vec3Dd v = rotation_mat.inverse() * arl::Vec3Dd(-dx, dy, 0.0) * pg;
 
-        axes_center = axes_center + v;
         visualizer->axes_box.moveCenter(v);
     }
-    else if (right_mouse_button.is_pressed)
+    else if (mouse_state.getRightButton().isPressed())
     {
-        const double dy = right_mouse_button.dy;
+        const double dy = mouse_state.getRightButton().getDy();
         const double m_g = 0.001;
         const arl::Vec3Dd s = visualizer->axes_box.getScale();
         const arl::Vec3Dd inc_vec = arl::Vec3Dd(dy * s.x, dy * s.y, dy * s.z) * m_g;
@@ -161,7 +76,7 @@ void addLighting()
     glLightfv(GL_LIGHT0, GL_POSITION, lightpos);
 }
 
-Visualizer::Visualizer(int argc, char *argv[])
+Visualizer::Visualizer(int argc, char* argv[])
 {
     // TODO: Visualizer constructor should take draw function as argument
 
@@ -271,14 +186,14 @@ void pressKey(int key, int xx, int yy)
     (void)yy;
     switch (key)
     {
-    case GLUT_KEY_LEFT:
-        break;
-    case GLUT_KEY_RIGHT:
-        break;
-    case GLUT_KEY_UP:
-        break;
-    case GLUT_KEY_DOWN:
-        break;
+        case GLUT_KEY_LEFT:
+            break;
+        case GLUT_KEY_RIGHT:
+            break;
+        case GLUT_KEY_UP:
+            break;
+        case GLUT_KEY_DOWN:
+            break;
     }
 }
 
@@ -288,17 +203,17 @@ void releaseKey(int key, int x, int y)
     (void)y;
     switch (key)
     {
-    case GLUT_KEY_LEFT:
-        break;
-    case GLUT_KEY_RIGHT:
-        break;
-    case GLUT_KEY_UP:
-        break;
-    case GLUT_KEY_DOWN:
-        break;
-    default:
+        case GLUT_KEY_LEFT:
+            break;
+        case GLUT_KEY_RIGHT:
+            break;
+        case GLUT_KEY_UP:
+            break;
+        case GLUT_KEY_DOWN:
+            break;
+        default:
 
-        break;
+            break;
     }
 }
 

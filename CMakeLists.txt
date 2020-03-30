@@ -28,7 +28,8 @@ endif()
 add_executable (opengl-template-project-main main.cpp
                                         visualizer/visualizer.cpp
                                         visualizer/view_angles.cpp
-                                        visualizer/axes_box.cpp)
+                                        visualizer/axes_box.cpp
+                                        visualizer/mouse_state.cpp)
 target_link_libraries (opengl-template-project-main ${OPENGL_LIBRARIES}
                                                     ${GLUT_LIBRARY}
                                                     ${GLEW_LIBRARIES}
