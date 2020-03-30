@@ -1,0 +1,41 @@
+cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
+
+project(soft_ball)
+
+find_package(OpenGL REQUIRED)
+find_package(GLUT REQUIRED)
+find_package( OpenCV REQUIRED )
+# find_package(BOOST COMPONENTS system filesystem REQUIRED)
+
+include_directories(${OPENGL_INCLUDE_DIRS} ${GLUT_INCLUDE_DIRS})
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/sphere_subdivision)
+
+# INCLUDE_DIRECTORIES( ${Boost_INCLUDE_DIR} )
+link_directories(/usr/local/lib)
+
+# set(BOOST_LIBS boost_filesystem
+#                boost_system
+#                boost_thread)
+
+set (CMAKE_SKIP_RULE_DEPENDENCY TRUE)
+set (CMAKE_CXX_STANDARD 11)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -Wno-deprecated-declarations")
+
+set(CPP_FILES visualizer/visualizer.cpp
+              misc/colors.cpp
+              soft_ball/soft_ball.cpp
+              sphere_subdivision/edge.cpp
+              sphere_subdivision/face.cpp
+              sphere_subdivision/point.cpp
+              sphere_subdivision/subdivisor.cpp
+              shading/shading.cpp
+              movie_creator/movie_creator.cpp)
+
+add_executable (soft_ball main.cpp ${CPP_FILES})
+
+target_link_libraries (soft_ball ${OpenCV_LIBS}
+                                   ${OPENGL_LIBRARIES}
+                                   ${GLUT_LIBRARY})
